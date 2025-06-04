@@ -1,35 +1,47 @@
 /* style.css */
 
+/* ------------------------------------------------ */
+/* 1. DEFINE YOUR CUSTOM FONT                       */
+/* ------------------------------------------------ */
 @font-face {
-    font-family: 'MingGothicCustom';
-    src: url('Ming Gothic.ttf') format('truetype');
+    font-family: 'MingGothicCustom'; /* Name you'll use to apply the font */
+    src: url('Ming Gothic.ttf') format('truetype'); /* Points to your font file */
     font-weight: normal;
     font-style: normal;
 }
 
+/* ------------------------------------------------ */
+/* 2. GENERAL BODY AND HTML STYLES                  */
+/* ------------------------------------------------ */
 body, html {
     margin: 0;
     padding: 0;
     height: 100%;
-    overflow: hidden;
+    overflow: hidden; /* Prevents scrollbars if video is slightly larger */
 }
 
+/* ------------------------------------------------ */
+/* 3. VIDEO BACKGROUND STYLES                       */
+/* ------------------------------------------------ */
 .video-background {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: -1;
+    z-index: -1; /* Puts the video behind other content */
     background-color: #333; /* Fallback if video/poster fails */
 }
 
 #bgVideo {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: cover; /* Ensures the video covers the screen without distortion */
 }
 
+/* ------------------------------------------------ */
+/* 4. CONTENT STYLING (TEXT CONTAINER)              */
+/* ------------------------------------------------ */
 .content {
     display: flex;
     flex-direction: column;
@@ -41,23 +53,32 @@ body, html {
     z-index: 1;
 }
 
-/* style.css (relevant part) */
-
-/* ... (other styles: @font-face, body, .video-background, #bgVideo, .content) ... */
-
+/* ------------------------------------------------ */
+/* 5. "Velloraa" TEXT STYLING WITH REACTIVE PURPLE GLOW */
+/* ------------------------------------------------ */
 .content h1 {
-    font-size: 5rem;
-    color: white;
-    font-family: 'MingGothicCustom', sans-serif;
+    font-size: 5rem; /* Adjust size as needed */
+    color: white;    /* Base text color */
+    font-family: 'MingGothicCustom', sans-serif; /* Your custom font with a fallback */
+    
     /* CSS variables define the glow */
-    --glow-color-1: #A020F0;
+    --glow-color-1: #A020F0;    /* Main purple for reactive glow */
     --glow-blur-reactive: 10px; /* Initial/base blur, JS will update this */
-    --glow-color-2: #BA55D3;
+    /* --glow-color-2: #BA55D3; */ /* Not used in this simplified version */
+
+    /* --- SIMPLIFIED TEXT SHADOW FOR TESTING --- */
     text-shadow:
+        /* You can keep or comment out this white core for further testing: */
         0 0 7px #fff,
-        0 0 var(--glow-blur-reactive) var(--glow-color-1), /* This blur will react */
-        0 0 20px var(--glow-color-1), /* Static layer for fullness */
-        0 0 30px var(--glow-color-2), /* Static layer for fullness */
-        0 0 40px var(--glow-color-2); /* Static layer for fullness */
-    transition: text-shadow 0.1s ease-out; /* Smooths the visual change */
+        
+        /* ONLY THE REACTIVE GLOW LAYER IS ACTIVE: */
+        0 0 var(--glow-blur-reactive) var(--glow-color-1);
+        
+        /* --- These static layers are now commented out: --- */
+        /* 0 0 20px var(--glow-color-1), */
+        /* 0 0 30px var(--glow-color-2), */
+        /* 0 0 40px var(--glow-color-2); */
+
+    /* Optional: keep the transition, or comment it out if you want to see raw changes */
+    transition: text-shadow 0.1s ease-out;
 }
