@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function() {
         canvasCtx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
 
         const numBars = dataArray.length * 0.8; // Use about 80% of the available frequency bins
-        const barSpacing = 4; // Spacing between bars
+        const barSpacing = 2; // Spacing between bars
         const totalSpacing = (numBars - 1) * barSpacing;
         const barWidth = (canvas.width - totalSpacing) / numBars;
         
@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
         for (let i = 0; i < numBars; i++) {
             // Scale bar height: dataArray[i] is 0-255. Make it relative to canvas height.
             // Add a sensitivity factor.
-            const barHeightScale = ; // Adjust this to make bars taller/shorter
+            const barHeightScale = 1.5; // Adjust this to make bars taller/shorter
             const barHeight = (dataArray[i] / 255) * canvas.height * barHeightScale;
 
             // Color: static purple, or make it dynamic
