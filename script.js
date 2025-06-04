@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
         for (let i = 0; i < numBars; i++) {
             // Scale bar height: dataArray[i] is 0-255. Make it relative to canvas height.
             // Add a sensitivity factor.
-            const barHeightScale = 1.5; // Adjust this to make bars taller/shorter
+            const barHeightScale = 0.5; // Adjust this to make bars taller/shorter
             const barHeight = (dataArray[i] / 255) * canvas.height * barHeightScale;
 
             // Color: static purple, or make it dynamic
