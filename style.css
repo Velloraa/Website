@@ -72,7 +72,7 @@ body, html {
 #audioVisualizerCanvas {
     position: absolute;
     left: 52%; 
-    top: 45%;
+    top: 52%;
     transform: translate(-50%, -50%); 
     z-index: 1; /* Relative to .content, so it's above video, but below h1 in .content */
 }
