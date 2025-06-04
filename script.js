@@ -1,3 +1,5 @@
+// script.js
+
 document.addEventListener('DOMContentLoaded', function() {
     const video = document.getElementById('bgVideo');
     const velloraaText = document.querySelector('.content h1');
@@ -16,58 +18,54 @@ document.addEventListener('DOMContentLoaded', function() {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
 
-            // Create an audio source from the video element
-            // This might fail if the video metadata hasn't loaded yet, or if it's cross-origin (not an issue for local files)
             try {
-                if (!source) { // Check if source already exists
+                if (!source) {
                     source = audioContext.createMediaElementSource(video);
                 }
                 source.connect(analyser);
-                analyser.connect(audioContext.destination); // So you can still hear the audio
+                analyser.connect(audioContext.destination);
             } catch (e) {
                 console.error("Error connecting media element source:", e);
-                // Fallback or error message if needed
-                // For example, display a message "Could not initialize audio analysis."
-                // This might happen if the video is not yet ready or due to browser restrictions.
-                return; // Stop if source creation fails
+                return; 
             }
         }
 
-        // --- Resume AudioContext if it's suspended (often needed after user interaction) ---
-        // It's good practice to resume it on any user interaction or when play starts.
         if (audioContext.state === 'suspended') {
-            audioContext.resume();
+            audioContext.resume().catch(err => console.error("Error resuming AudioContext:", err));
         }
-        // ------------------------------------------------------------------------------------
 
-        analyser.fftSize = 256; // Smaller FFT size for quicker response, adjust as needed
+        analyser.fftSize = 256;
         const bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
 
-        drawGlow();
+        // Start the drawing loop if it's not already started
+        // (or ensure it continues if it was paused)
+        // We call it once here, and it will loop itself with requestAnimationFrame
+        if (!window.isGlowLoopRunning) { // Use a global flag or similar check
+             window.isGlowLoopRunning = true;
+             drawGlow();
+        }
     }
 
     function drawGlow() {
-        if (!analyser) {
-            requestAnimationFrame(drawGlow); // Keep trying if analyser not ready
+        if (!analyser || !window.isGlowLoopRunning) { // Check flag to stop loop if needed
+            window.isGlowLoopRunning = false; // Ensure flag is reset if loop stops
             return;
         }
 
-        analyser.getByteFrequencyData(dataArray); // Get frequency data
+        analyser.getByteFrequencyData(dataArray);
 
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
         }
-        const average = sum / dataArray.length;
+        const average = sum / dataArray.length || 0; // Ensure average is not NaN
 
-        // Normalize the average (0-255) to a more usable range for blur
-        // These values (minBlur, maxBlur, sensitivity) need tweaking!
-        const minBlur = 8;    // Minimum blur radius for the reactive glow
-        const maxBlur = 40;   // Maximum blur radius
-        const sensitivity = 1.5; // How much the audio affects the blur (higher means more sensitive)
+        // --- ADJUST THESE VALUES FOR SENSITIVITY ---
+        const minBlur = 5;    // Minimum blur radius
+        const maxBlur = 60;   // Maximum blur radius
+        const sensitivity = 3.5; // Increased sensitivity
 
-        // Map the average audio level to the blur radius
         let newBlur = minBlur + (average / 255) * (maxBlur - minBlur) * sensitivity;
         newBlur = Math.min(maxBlur, Math.max(minBlur, newBlur)); // Clamp the value
 
@@ -77,30 +75,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
         requestAnimationFrame(drawGlow); // Loop the drawing function
     }
+    window.isGlowLoopRunning = false; // Initialize the flag
 
-    // --- Attempt to initialize audio processing ---
+
     if (video && velloraaText) {
-        // Option 1: Try to start when video can play (might still need interaction for AudioContext)
-        video.oncanplay = () => {
-            // console.log("Video can play. Attempting to init audio glow.");
-            // initAudioReactiveGlow(); // Initial attempt
-        };
-
         video.onplay = () => {
             // console.log("Video is playing. Attempting to init audio glow.");
             if (!audioContext || audioContext.state === 'suspended') {
                 initAudioReactiveGlow();
+            } else if (audioContext.state === 'running' && !window.isGlowLoopRunning) {
+                // If context is running but loop was stopped for some reason, restart it
+                window.isGlowLoopRunning = true;
+                drawGlow();
             }
         };
+        
+        video.onpause = () => {
+            // console.log("Video paused. Stopping glow loop.");
+            // Optionally stop the glow loop when video is paused to save resources
+             window.isGlowLoopRunning = false;
+        };
 
-        // Option 2: A more robust way to ensure AudioContext starts is after a user click.
-        // You could add a small, unobtrusive "Click to enable audio FX" button, or:
+        // Attempt to initialize and resume AudioContext on user interaction
         document.body.addEventListener('click', () => {
             if (!audioContext || audioContext.state === 'suspended') {
                 // console.log("Body clicked. Attempting to init audio glow if needed.");
                 initAudioReactiveGlow();
+            } else if (audioContext.state === 'running' && !window.isGlowLoopRunning && !video.paused) {
+                // If context is running, video is playing, but loop stopped, restart.
+                window.isGlowLoopRunning = true;
+                drawGlow();
             }
-        }, { once: true }); // { once: true } ensures this listener runs only once
+        }, { once: false }); // Changed once to false to allow re-init if context gets messed up
+                            // Though ideally, it sets up once and just resumes.
+                            // For robustness on user clicking again if something went wrong.
 
     } else {
         console.error("Video element or text element not found.");
