@@ -3,172 +3,195 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded and parsed');
 
+    // --- Get DOM Elements ---
     const video = document.getElementById('bgVideo');
     const backgroundMusic = document.getElementById('backgroundMusic');
-    const velloraaText = document.querySelector('.content h1'); // We might not need this directly now
+    // const velloraaText = document.querySelector('.content h1'); // Not directly manipulated by this JS
 
-    // --- Canvas and Audio Visualizer Setup ---
+    // For Canvas Visualizer
     const canvas = document.getElementById('audioVisualizerCanvas');
-    let canvasCtx; // Will be initialized later
+    let canvasCtx;
 
-    // Web Audio API variables
-    let audioContext;
-    let analyser;
-    let sourceNode; // Will be created from the backgroundMusic element
-    let dataArray; // For frequency data
-    window.isVisualizerLoopRunning = false;
+    // For Custom Cursor & Trail
+    const customCursor = document.getElementById('customCursor');
 
+    // --- Error Checking for Elements ---
     if (!video) console.error('Video element #bgVideo not found!');
     if (!backgroundMusic) console.error('Audio element #backgroundMusic not found!');
     if (!canvas) {
         console.error('Canvas element #audioVisualizerCanvas not found!');
     } else {
         canvasCtx = canvas.getContext('2d');
+        if (!canvasCtx) console.error('Failed to get 2D context for visualizer canvas!');
+    }
+    if (!customCursor) console.error('Custom cursor element #customCursor not found!');
+
+
+    // --- Web Audio API & Visualizer Variables ---
+    let audioContext;
+    let analyser;
+    let sourceNodeVisualizer; // Source node for the visualizer from backgroundMusic
+    let visualizerDataArray;
+    window.isVisualizerLoopRunning = false;
+
+    // --- Custom Cursor & Trail Variables ---
+    const trailDots = [];
+    const numTrailDots = 15;
+    let mouseX = -100;
+    let mouseY = -100;
+
+
+    // --- Initialize Trail Dots ---
+    if (customCursor) { // Only create trail if custom cursor exists
+        for (let i = 0; i < numTrailDots; i++) {
+            const dot = document.createElement('div');
+            dot.classList.add('trail-dot');
+            document.body.appendChild(dot);
+            trailDots.push({
+                element: dot,
+                x: -100, // Start off-screen
+                y: -100
+            });
+        }
     }
 
-    // --- Function to initialize Web Audio API for Visualizer ---
+    // --- Mouse Move Listener for Custom Cursor ---
+    if (customCursor) {
+        document.addEventListener('mousemove', function(e) {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            // Adjust offsets to center the 20x30 cursor. (10 for x, 15 for y for true center)
+            // Tweaking this based on perceived center of the cross might be needed.
+            customCursor.style.left = (mouseX - 10) + 'px';
+            customCursor.style.top = (mouseY - 15) + 'px';
+        });
+    }
+
+    // --- Animate Trail Function ---
+    function animateTrail() {
+        if (!customCursor) return; // Don't run if no cursor
+
+        let targetX = mouseX;
+        let targetY = mouseY;
+
+        trailDots.forEach((dot, index) => {
+            const easeFactor = 0.35;
+            dot.x += (targetX - dot.x) * easeFactor;
+            dot.y += (targetY - dot.y) * easeFactor;
+
+            // Offset by half dot size (assuming base size 10px, scaled)
+            const currentScale = Math.max(0, 1 - (index / numTrailDots) * 0.8);
+            const currentDotSize = 10 * currentScale;
+            dot.element.style.transform = `translate(${dot.x - (currentDotSize / 2)}px, ${dot.y - (currentDotSize / 2)}px)`;
+
+            const opacity = Math.max(0, 1 - (index / numTrailDots) * 0.9);
+            dot.element.style.width = `${currentDotSize}px`;
+            dot.element.style.height = `${currentDotSize}px`;
+            dot.element.style.opacity = opacity;
+
+            targetX = dot.x;
+            targetY = dot.y;
+        });
+        requestAnimationFrame(animateTrail);
+    }
+
+    // --- Function to Initialize Web Audio API for Visualizer ---
     function initAudioVisualizer() {
-        if (!backgroundMusic || !canvasCtx) {
-            console.error("Cannot init visualizer: Music or Canvas context missing.");
-            return;
-        }
+        if (!backgroundMusic || !canvasCtx) return;
         if (audioContext && audioContext.state === 'closed') {
-            audioContext = null; sourceNode = null;
+            audioContext = null; sourceNodeVisualizer = null;
         }
 
         if (!audioContext) {
             try {
-                console.log('Creating new AudioContext for visualizer...');
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                console.log('Visualizer AudioContext created. State:', audioContext.state);
-
                 analyser = audioContext.createAnalyser();
-                analyser.smoothingTimeConstant = 0.8; // Adjust for smoother transitions
-                console.log('Visualizer AnalyserNode created.');
+                analyser.smoothingTimeConstant = 0.8;
 
-                if (!sourceNode) {
-                    sourceNode = audioContext.createMediaElementSource(backgroundMusic);
-                    console.log('MediaElementSourceNode for visualizer created from music element.');
+                if (!sourceNodeVisualizer) { // Create source only once
+                    sourceNodeVisualizer = audioContext.createMediaElementSource(backgroundMusic);
                 }
-
-                sourceNode.connect(analyser);
-                analyser.connect(audioContext.destination); // Output audio to speakers
+                sourceNodeVisualizer.connect(analyser);
+                analyser.connect(audioContext.destination);
                 console.log('Visualizer audio pipeline connected.');
-
             } catch (e) {
-                console.error("Error during visualizer AudioContext setup:", e);
-                return;
+                console.error("Error during visualizer AudioContext setup:", e); return;
             }
         }
 
         if (audioContext.state === 'suspended') {
-            console.log('Visualizer AudioContext suspended. Attempting to resume...');
             audioContext.resume().then(() => {
                 console.log('Visualizer AudioContext resumed. State:', audioContext.state);
                 if (!window.isVisualizerLoopRunning && !backgroundMusic.paused) {
                     window.isVisualizerLoopRunning = true;
-                    resizeCanvas(); // Resize canvas before starting loop
-                    drawVisualizer();
+                    resizeCanvas(); drawVisualizer();
                 }
-            }).catch(err => console.error("Error resuming visualizer AudioContext:", err));
+            }).catch(err => console.error("Error resuming visualizer AC:", err));
         } else if (audioContext.state === 'running' && !window.isVisualizerLoopRunning && !backgroundMusic.paused) {
-            console.log('Visualizer AC running, music playing, starting visualizer loop.');
             window.isVisualizerLoopRunning = true;
-            resizeCanvas(); // Resize canvas before starting loop
-            drawVisualizer();
+            resizeCanvas(); drawVisualizer();
         }
 
-        analyser.fftSize = 256; // Number of samples for FFT (power of 2, e.g., 256, 512, 1024)
-                               // Affects number of bars / data points
-        const bufferLength = analyser.frequencyBinCount; // Half of fftSize
-        dataArray = new Uint8Array(bufferLength);
-        console.log('Visualizer Analyser FFT set. Buffer length:', bufferLength);
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        visualizerDataArray = new Uint8Array(bufferLength);
     }
 
+    // --- Canvas Resize Function ---
     function resizeCanvas() {
-        if (!canvas) return;
-        // Example: Set canvas size. Adjust these values as needed.
-        // Make it somewhat responsive or sized relative to the text.
-        // For now, a fixed size.
-        const desiredWidth = Math.min(window.innerWidth * 0.7, 600); // Max 600px or 70% of window
-        const desiredHeight = 200;
-
+        if (!canvas || !canvasCtx) return;
+        const desiredWidth = Math.min(window.innerWidth * 0.6, 500); // Max 500px or 60%
+        const desiredHeight = 180;
         canvas.width = desiredWidth;
         canvas.height = desiredHeight;
-        console.log(`Canvas resized to: ${canvas.width}x${canvas.height}`);
+        console.log(`Visualizer Canvas resized to: ${canvas.width}x${canvas.height}`);
     }
-    // Call resizeCanvas initially and on window resize
-    // window.addEventListener('resize', resizeCanvas); // Optional: make it responsive
+    // Consider calling resizeCanvas on window.addEventListener('resize', resizeCanvas); for responsiveness
 
-    let frameCount = 0;
-
-    // --- Function to draw the visualizer on the canvas ---
+    // --- Draw Visualizer Function ---
     function drawVisualizer() {
-        if (!window.isVisualizerLoopRunning || !analyser || !dataArray || !canvasCtx ||
-            !audioContext || audioContext.state !== 'running') {
-            if (audioContext && audioContext.state !== 'running') {
-                window.isVisualizerLoopRunning = false;
-            }
+        if (!window.isVisualizerLoopRunning || !analyser || !visualizerDataArray || !canvasCtx || !audioContext || audioContext.state !== 'running') {
+            if (audioContext && audioContext.state !== 'running') window.isVisualizerLoopRunning = false;
             return;
         }
-        requestAnimationFrame(drawVisualizer); // Loop the drawing
+        requestAnimationFrame(drawVisualizer);
+        analyser.getByteFrequencyData(visualizerDataArray);
+        canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
-        analyser.getByteFrequencyData(dataArray); // Get frequency data into dataArray
-
-        canvasCtx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
-
-        const numBars = dataArray.length * 0.8; // Use about 80% of the available frequency bins
-        const barSpacing = 4; // Spacing between bars
+        const numBars = visualizerDataArray.length * 0.7; // Use 70% of bins
+        const barSpacing = 1;
         const totalSpacing = (numBars - 1) * barSpacing;
         const barWidth = (canvas.width - totalSpacing) / numBars;
-        
         let x = 0;
 
         for (let i = 0; i < numBars; i++) {
-            // Scale bar height: dataArray[i] is 0-255. Make it relative to canvas height.
-            // Add a sensitivity factor.
-            const barHeightScale = 0.5; // Adjust this to make bars taller/shorter
-            const barHeight = (dataArray[i] / 255) * canvas.height * barHeightScale;
-
-            // Color: static purple, or make it dynamic
-            const r = 128 + (dataArray[i] / 2); // More purple/blue with intensity: 128-255
+            const barHeightScale = 1.3;
+            const barHeight = (visualizerDataArray[i] / 255) * canvas.height * barHeightScale;
+            const r = 100 + (visualizerDataArray[i] / 2.5); // Dynamic purple shade
             const g = 0;
-            const b = 128 + dataArray[i];       // More magenta/purple with intensity: 128-255
-            canvasCtx.fillStyle = `rgb(${r},${g},${b})`;
-            // Or a fixed purple: canvasCtx.fillStyle = 'rgba(160, 32, 240, 0.8)'; // #A020F0 with opacity
-
-            // Draw bar (from bottom up)
+            const b = 120 + (visualizerDataArray[i] / 2);
+            canvasCtx.fillStyle = `rgb(${Math.min(255,r)},${g},${Math.min(255,b)})`;
             canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-
-            x += barWidth + barSpacing; // Move to next bar position
-        }
-
-        frameCount++;
-        if (frameCount % 200 === 0) { // Less frequent logging
-             // Optional: log average audio if needed for debugging bar heights
-            // let sum = 0; dataArray.forEach(val => sum += val); const avg = sum / dataArray.length;
-            // console.log(`Visualizer Loop: Avg Freq Data ~ ${avg.toFixed(2)}, AC State: ${audioContext.state}`);
+            x += barWidth + barSpacing;
         }
     }
 
-
-    // --- Background Music Playback Logic ---
+    // --- Background Music Playback & Visualizer Initialization ---
     if (backgroundMusic) {
         backgroundMusic.volume = 0.3;
-
-        const startMusicAndVisualizer = () => {
+        const startMusicAndEffects = () => {
             console.log('Music playback successful. Initializing audio visualizer.');
-            initAudioVisualizer();
+            initAudioVisualizer(); // Initialize Web Audio API and visualizer
         };
 
         const playPromise = backgroundMusic.play();
         if (playPromise !== undefined) {
-            playPromise.then(startMusicAndVisualizer)
+            playPromise.then(startMusicAndEffects)
             .catch(error => {
                 console.warn('Music autoplay prevented:', error);
                 const playMusicOnClick = () => {
                     backgroundMusic.play()
-                        .then(startMusicAndVisualizer)
+                        .then(startMusicAndEffects)
                         .catch(err => console.error('Error playing music after click:', err));
                 };
                 document.body.addEventListener('click', playMusicOnClick, { once: true });
@@ -181,15 +204,14 @@ document.addEventListener('DOMContentLoaded', function() {
             window.isVisualizerLoopRunning = false;
         };
         backgroundMusic.onplay = () => {
-            console.log('Music playing event (visualizer).');
+            console.log('Music playing event (main).');
             if (audioContext && audioContext.state === 'running') {
                 if (!window.isVisualizerLoopRunning) {
-                    console.log('Music playing, AC running, restarting visualizer loop.');
                     window.isVisualizerLoopRunning = true;
-                    resizeCanvas(); // Ensure canvas is sized correctly
+                    resizeCanvas(); // Ensure canvas is sized
                     drawVisualizer();
                 }
-            } else if (audioContext && audioContext.state === 'suspended') {
+            } else if (audioContext && audioContext.state === 'suspended') { // Try to resume if suspended
                 audioContext.resume().then(() => {
                     if (!window.isVisualizerLoopRunning) {
                          window.isVisualizerLoopRunning = true;
@@ -200,7 +222,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
     } else {
-        console.log('Background music element not found. No music or visualizer will be initialized.');
+        console.log('Background music element not found.');
     }
+
+    // --- Start Cursor Trail Animation ---
+    if (customCursor) { // Start trail only if cursor element exists
+        animateTrail();
+        console.log('Custom cursor trail animation started.');
+    }
+
     console.log('Initial script setup complete.');
 });
