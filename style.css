@@ -12,7 +12,7 @@ body, html {
     padding: 0;
     height: 100%;
     overflow: hidden;
-    background-color: #000; /* Added a default background for initial load */
+    background-color: #000; /* Base background color */
 }
 
 #entryOverlay {
@@ -24,16 +24,16 @@ body, html {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #000; /* Black background for the entry screen */
-    z-index: 100; /* Ensure it's on top */
+    background-color: #000;
+    z-index: 100; /* Highest, for the entry message */
     cursor: pointer;
 }
 
 #entryText {
-    font-size: 3rem; /* Small-medium size */
+    font-size: 3rem; 
     color: white;
     font-family: 'MingGothicCustom', sans-serif;
-    text-shadow: /* Same glow effect as .content h1 */
+    text-shadow: 
         0 0 7px #fff,
         0 0 10px #A020F0,
         0 0 20px #A020F0,
@@ -47,8 +47,8 @@ body, html {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: -1;
-    background-color: #333; /* Fallback */
+    z-index: 1; /* Changed from -1. This is the new base layer for visible content. */
+    background-color: #333; /* Fallback if video doesn't load */
 }
 
 #bgVideo {
@@ -64,17 +64,17 @@ body, html {
     align-items: center;
     height: 100vh;
     text-align: center;
-    position: relative; /* Important for positioning canvas */
-    z-index: 1; /* Ensure .content is above .video-background */
+    position: relative; 
+    z-index: 2; /* Changed from 1. Sits on top of the video background. */
 }
 
 /* Canvas Styling */
 #audioVisualizerCanvas {
     position: absolute;
-    left: 50%; /* Corrected from 52.5% for better centering if h1 is also centered*/
+    left: 50%; 
     top: 50%;
-    transform: translate(-50%, -50%); /* Center the canvas */
-    z-index: 1; /* Canvas itself */
+    transform: translate(-50%, -50%); 
+    z-index: 1; /* Relative to .content, so it's above video, but below h1 in .content */
 }
 
 .content h1 {
@@ -87,11 +87,10 @@ body, html {
         0 0 20px #A020F0,
         0 0 30px #BA55D3,
         0 0 45px #BA55D3;
-    position: relative; /* Ensure h1 can have a z-index */
-    z-index: 2; /* Make sure h1 is above the canvas */
+    position: relative; 
+    z-index: 2; /* Relative to .content, ensures it's above the canvas in .content */
 }
 
-/* Ensure appContainer takes up full space if needed, though its children handle layout */
 #appContainer {
     width: 100%;
     height: 100%;

@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let analyser;
     let sourceNode;
     let dataArray;
-    window.isVisualizerLoopRunning = false; // Keep this global if other scripts might interact
+    window.isVisualizerLoopRunning = false;
 
     if (!entryOverlay) console.error('Entry overlay #entryOverlay not found!');
     if (!appContainer) console.error('App container #appContainer not found!');
@@ -46,15 +46,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 analyser.smoothingTimeConstant = 0.8;
                 console.log('Visualizer AnalyserNode created.');
 
-                if (!sourceNode) { // Ensure sourceNode is created only once
+                if (!sourceNode) {
                     sourceNode = audioContext.createMediaElementSource(backgroundMusic);
                     console.log('MediaElementSourceNode for visualizer created from music element.');
                     sourceNode.connect(analyser);
-                    analyser.connect(audioContext.destination); // Output audio to speakers
+                    analyser.connect(audioContext.destination);
                     console.log('Visualizer audio pipeline connected.');
                 }
-
-
             } catch (e) {
                 console.error("Error during visualizer AudioContext setup:", e);
                 return;
@@ -89,31 +87,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const velloraaTextElement = document.querySelector('.content h1');
         let referenceElement = velloraaTextElement;
         if (!referenceElement || getComputedStyle(referenceElement).display === 'none') {
-            referenceElement = canvas.parentElement; // Fallback to parent if text hidden
+            referenceElement = canvas.parentElement; 
         }
         
-        // Attempt to size canvas relative to the "Velloraa" text or its container
-        // This is a simplified approach; you might need more sophisticated logic
-        // if the text's size is dynamic or hard to predict before rendering.
         const textRect = referenceElement.getBoundingClientRect();
         
-        // Make canvas wide enough for text, with some padding, or a max width
         const desiredWidth = Math.min(window.innerWidth * 0.7, Math.max(300, textRect.width + 40));
-        const desiredHeight = Math.max(100, textRect.height * 1.5); // Taller than text
+        const desiredHeight = Math.max(100, textRect.height * 1.5); 
 
         canvas.width = desiredWidth;
         canvas.height = desiredHeight;
         console.log(`Canvas resized to: ${canvas.width}x${canvas.height} based on reference element`);
     }
     
-    // window.addEventListener('resize', resizeCanvas); // Optional: make it responsive
+    // window.addEventListener('resize', resizeCanvas); // Optional
 
-    let frameCount = 0;
     function drawVisualizer() {
         if (!window.isVisualizerLoopRunning || !analyser || !dataArray || !canvasCtx ||
             !audioContext || audioContext.state !== 'running') {
             if (audioContext && audioContext.state !== 'running') {
-                window.isVisualizerLoopRunning = false; // Stop if AC is not running
+                window.isVisualizerLoopRunning = false;
             }
             return;
         }
@@ -138,40 +131,66 @@ document.addEventListener('DOMContentLoaded', function() {
             canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
             x += barWidth + barSpacing;
         }
-        // frameCount++; // Not strictly needed unless debugging
     }
 
     function startApp() {
         console.log('Starting main application...');
         if (appContainer) {
-            appContainer.style.display = 'block'; // Or 'flex' if its direct children need flex layout
+            appContainer.style.display = 'block';
         }
         
-        // Resize canvas now that it's visible
         resizeCanvas(); 
 
         if (video) {
-            video.play().catch(error => console.error('Error playing video:', error));
+            video.loop = true; 
+            video.muted = true; 
+
+            const attemptPlayVideo = () => {
+                video.play()
+                    .then(() => {
+                        console.log("Video playback started successfully.");
+                    })
+                    .catch(error => {
+                        console.error('Error playing video:', error);
+                    });
+            };
+
+            if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+                console.log('Video metadata already loaded, attempting to play.');
+                attemptPlayVideo();
+            } else {
+                console.log('Video metadata not yet loaded, adding event listener for loadedmetadata.');
+                video.addEventListener('loadedmetadata', () => {
+                    console.log('Video metadata loaded via event, now attempting to play.');
+                    attemptPlayVideo();
+                }, { once: true });
+                
+                video.addEventListener('error', (e) => {
+                    console.error('Error occurred with the video element itself (e.g., bad source, network issue):', e);
+                });
+            }
+
+        } else {
+            console.error('Video element #bgVideo not found when trying to start app!');
         }
 
         if (backgroundMusic) {
             backgroundMusic.volume = 0.3;
-            backgroundMusic.loop = true; // Ensure loop is set
+            backgroundMusic.loop = true; 
 
             const startMusicAndVisualizer = () => {
                 console.log('Music playback successful. Initializing audio visualizer.');
                 initAudioVisualizer();
             };
 
-            // User interaction (the click to enter) should allow audio to play.
             const playPromise = backgroundMusic.play();
             if (playPromise !== undefined) {
                 playPromise.then(startMusicAndVisualizer)
                 .catch(error => {
                     console.warn('Music play prevented even after initial interaction:', error);
-                    // You might add a fallback UI element here to manually start music if this fails
-                    document.body.addEventListener('click', () => { // One more attempt on another click
-                         backgroundMusic.play().then(startMusicAndVisualizer).catch(e => console.error("Still can't play", e));
+                    // Fallback attempt
+                    document.body.addEventListener('click', () => { 
+                         backgroundMusic.play().then(startMusicAndVisualizer).catch(e => console.error("Still can't play music after second attempt", e));
                     }, { once: true });
                 });
             }
@@ -182,13 +201,12 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             backgroundMusic.onplay = () => {
                 console.log('Music playing event (visualizer).');
-                 // Ensure AudioContext is running and visualizer starts
                 if (audioContext && audioContext.state === 'suspended') {
                     audioContext.resume().then(() => {
                         if (!window.isVisualizerLoopRunning) {
                              console.log('AC resumed, restarting visualizer loop.');
                              window.isVisualizerLoopRunning = true;
-                             resizeCanvas(); // Ensure canvas is sized
+                             resizeCanvas();
                              drawVisualizer();
                         }
                     });
@@ -196,10 +214,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!window.isVisualizerLoopRunning) {
                         console.log('Music playing, AC running, restarting visualizer loop.');
                         window.isVisualizerLoopRunning = true;
-                        resizeCanvas(); // Ensure canvas is sized
+                        resizeCanvas();
                         drawVisualizer();
                     }
-                } else if (!audioContext) { // If visualizer wasn't initialized yet
+                } else if (!audioContext) { 
                     console.log('Music playing, initializing visualizer for the first time.');
                     initAudioVisualizer();
                 }
@@ -213,12 +231,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (entryOverlay) {
         entryOverlay.addEventListener('click', function() {
             console.log('"Click 2 Enter" clicked.');
-            entryOverlay.style.display = 'none'; // Hide the overlay
-            startApp(); // Start the main application
-        }, { once: true }); // Ensure this listener runs only once
+            entryOverlay.style.display = 'none'; 
+            startApp(); 
+        }, { once: true }); 
     } else {
-        // Fallback if entryOverlay is not found (e.g., during development/testing)
-        console.warn('Entry overlay not found, starting app directly.');
+        console.warn('Entry overlay not found, attempting to start app directly (may not be intended).');
         startApp();
     }
 });
