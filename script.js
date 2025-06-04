@@ -3,181 +3,204 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded and parsed');
 
-    const video = document.getElementById('bgVideo'); // For the background video (plays muted)
-    const velloraaText = document.querySelector('.content h1'); // Text element for the glow
-    const backgroundMusic = document.getElementById('backgroundMusic'); // For the MP3 music
+    const video = document.getElementById('bgVideo');
+    const backgroundMusic = document.getElementById('backgroundMusic');
+    const velloraaText = document.querySelector('.content h1'); // We might not need this directly now
+
+    // --- Canvas and Audio Visualizer Setup ---
+    const canvas = document.getElementById('audioVisualizerCanvas');
+    let canvasCtx; // Will be initialized later
 
     // Web Audio API variables
     let audioContext;
     let analyser;
     let sourceNode; // Will be created from the backgroundMusic element
-    let dataArray;
-    window.isGlowLoopRunning = false; // Flag to control the animation loop
+    let dataArray; // For frequency data
+    window.isVisualizerLoopRunning = false;
 
     if (!video) console.error('Video element #bgVideo not found!');
-    if (!velloraaText) console.error('Text element .content h1 not found!');
     if (!backgroundMusic) console.error('Audio element #backgroundMusic not found!');
+    if (!canvas) {
+        console.error('Canvas element #audioVisualizerCanvas not found!');
+    } else {
+        canvasCtx = canvas.getContext('2d');
+    }
 
-    // --- Function to initialize Web Audio API for reactive glow ---
-    function initAudioReactiveGlow() {
-        if (!backgroundMusic || velloraaText === null) {
-            console.error("Cannot init glow: Music or Text element missing.");
+    // --- Function to initialize Web Audio API for Visualizer ---
+    function initAudioVisualizer() {
+        if (!backgroundMusic || !canvasCtx) {
+            console.error("Cannot init visualizer: Music or Canvas context missing.");
             return;
         }
-        // Ensure AudioContext is not already created and running in a bad state
         if (audioContext && audioContext.state === 'closed') {
-            audioContext = null; 
-            sourceNode = null; 
+            audioContext = null; sourceNode = null;
         }
 
-        if (!audioContext) { // Initialize only once, or if closed
+        if (!audioContext) {
             try {
-                console.log('Creating new AudioContext for music analysis...');
+                console.log('Creating new AudioContext for visualizer...');
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                console.log('AudioContext created. Initial State:', audioContext.state);
+                console.log('Visualizer AudioContext created. State:', audioContext.state);
 
                 analyser = audioContext.createAnalyser();
-                console.log('AnalyserNode created.');
+                analyser.smoothingTimeConstant = 0.8; // Adjust for smoother transitions
+                console.log('Visualizer AnalyserNode created.');
 
-                if (!sourceNode) { // Create source node from the <audio> element only once
+                if (!sourceNode) {
                     sourceNode = audioContext.createMediaElementSource(backgroundMusic);
-                    console.log('MediaElementSourceNode created from backgroundMusic element.');
+                    console.log('MediaElementSourceNode for visualizer created from music element.');
                 }
 
                 sourceNode.connect(analyser);
-                console.log('Music sourceNode connected to Analyser.');
-                // Connect analyser to output ONLY IF you want the music through AudioContext pipeline
-                // If the <audio> tag plays directly, this isn't strictly needed for analysis ONLY
-                // But it's good practice if you were to add more AudioNodes later.
-                // For simple analysis from an already playing <audio> tag, sourceNode -> analyser is enough.
-                // However, to ensure it works reliably and to enable future effects, connect to destination.
-                analyser.connect(audioContext.destination);
-                console.log('Analyser connected to audioContext.destination.');
+                analyser.connect(audioContext.destination); // Output audio to speakers
+                console.log('Visualizer audio pipeline connected.');
 
             } catch (e) {
-                console.error("Error during AudioContext or Node setup for music:", e);
-                return; 
-            }
-        }
-
-        // Attempt to resume context if it's suspended
-        if (audioContext.state === 'suspended') {
-            console.log('Music AudioContext is suspended. Attempting to resume...');
-            audioContext.resume()
-                .then(() => {
-                    console.log('Music AudioContext resumed. State:', audioContext.state);
-                    if (!window.isGlowLoopRunning && !backgroundMusic.paused) {
-                        console.log('Music AC resumed, music playing, starting glow loop.');
-                        window.isGlowLoopRunning = true;
-                        drawGlow();
-                    }
-                })
-                .catch(err => console.error("Error resuming music AudioContext:", err));
-        } else if (audioContext.state === 'running' && !window.isGlowLoopRunning && !backgroundMusic.paused) {
-            console.log('Music AC running, music playing, ensuring glow loop starts.');
-            window.isGlowLoopRunning = true;
-            drawGlow();
-        }
-
-        analyser.fftSize = 256; // Adjust for sensitivity and performance
-        const bufferLength = analyser.frequencyBinCount;
-        dataArray = new Uint8Array(bufferLength);
-        console.log('Music Analyser FFT size set, dataArray initialized.');
-    }
-
-    let frameCount = 0; // For periodic logging
-
-    // --- Function to draw the glow based on audio ---
-    function drawGlow() {
-        if (!window.isGlowLoopRunning) return;
-        if (!analyser || !dataArray || !audioContext || audioContext.state !== 'running') {
-            if (audioContext && audioContext.state !== 'running') {
-                window.isGlowLoopRunning = false; 
+                console.error("Error during visualizer AudioContext setup:", e);
                 return;
             }
-            requestAnimationFrame(drawGlow);
-            return;
         }
 
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const average = sum / dataArray.length || 0;
+        if (audioContext.state === 'suspended') {
+            console.log('Visualizer AudioContext suspended. Attempting to resume...');
+            audioContext.resume().then(() => {
+                console.log('Visualizer AudioContext resumed. State:', audioContext.state);
+                if (!window.isVisualizerLoopRunning && !backgroundMusic.paused) {
+                    window.isVisualizerLoopRunning = true;
+                    resizeCanvas(); // Resize canvas before starting loop
+                    drawVisualizer();
+                }
+            }).catch(err => console.error("Error resuming visualizer AudioContext:", err));
+        } else if (audioContext.state === 'running' && !window.isVisualizerLoopRunning && !backgroundMusic.paused) {
+            console.log('Visualizer AC running, music playing, starting visualizer loop.');
+            window.isVisualizerLoopRunning = true;
+            resizeCanvas(); // Resize canvas before starting loop
+            drawVisualizer();
+        }
 
-        // --- Adjust these for desired "brightness" (blur radius) effect ---
-        const minBlur = 8;    // Minimum blur when quiet
-        const maxBlur = 150;   // Maximum blur when loud (making it appear "brighter"/larger)
-        const sensitivity = 5.0; // How much audio affects blur (higher = more sensitive)
+        analyser.fftSize = 256; // Number of samples for FFT (power of 2, e.g., 256, 512, 1024)
+                               // Affects number of bars / data points
+        const bufferLength = analyser.frequencyBinCount; // Half of fftSize
+        dataArray = new Uint8Array(bufferLength);
+        console.log('Visualizer Analyser FFT set. Buffer length:', bufferLength);
+    }
 
-        let newBlur = minBlur + (average / 255) * (maxBlur - minBlur) * sensitivity;
-        newBlur = Math.min(maxBlur, Math.max(minBlur, newBlur)); // Clamp value
+    function resizeCanvas() {
+        if (!canvas) return;
+        // Example: Set canvas size. Adjust these values as needed.
+        // Make it somewhat responsive or sized relative to the text.
+        // For now, a fixed size.
+        const desiredWidth = Math.min(window.innerWidth * 0.7, 600); // Max 600px or 70% of window
+        const desiredHeight = 200;
 
-        if (velloraaText) {
-            velloraaText.style.setProperty('--glow-blur-reactive', newBlur + 'px');
+        canvas.width = desiredWidth;
+        canvas.height = desiredHeight;
+        console.log(`Canvas resized to: ${canvas.width}x${canvas.height}`);
+    }
+    // Call resizeCanvas initially and on window resize
+    // window.addEventListener('resize', resizeCanvas); // Optional: make it responsive
+
+    let frameCount = 0;
+
+    // --- Function to draw the visualizer on the canvas ---
+    function drawVisualizer() {
+        if (!window.isVisualizerLoopRunning || !analyser || !dataArray || !canvasCtx ||
+            !audioContext || audioContext.state !== 'running') {
+            if (audioContext && audioContext.state !== 'running') {
+                window.isVisualizerLoopRunning = false;
+            }
+            return;
+        }
+        requestAnimationFrame(drawVisualizer); // Loop the drawing
+
+        analyser.getByteFrequencyData(dataArray); // Get frequency data into dataArray
+
+        canvasCtx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+        const numBars = dataArray.length * 0.8; // Use about 80% of the available frequency bins
+        const barSpacing = 2; // Spacing between bars
+        const totalSpacing = (numBars - 1) * barSpacing;
+        const barWidth = (canvas.width - totalSpacing) / numBars;
+        
+        let x = 0;
+
+        for (let i = 0; i < numBars; i++) {
+            // Scale bar height: dataArray[i] is 0-255. Make it relative to canvas height.
+            // Add a sensitivity factor.
+            const barHeightScale = 1.5; // Adjust this to make bars taller/shorter
+            const barHeight = (dataArray[i] / 255) * canvas.height * barHeightScale;
+
+            // Color: static purple, or make it dynamic
+            const r = 128 + (dataArray[i] / 2); // More purple/blue with intensity: 128-255
+            const g = 0;
+            const b = 128 + dataArray[i];       // More magenta/purple with intensity: 128-255
+            canvasCtx.fillStyle = `rgb(${r},${g},${b})`;
+            // Or a fixed purple: canvasCtx.fillStyle = 'rgba(160, 32, 240, 0.8)'; // #A020F0 with opacity
+
+            // Draw bar (from bottom up)
+            canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+            x += barWidth + barSpacing; // Move to next bar position
         }
 
         frameCount++;
-        if (frameCount % 100 === 0) {
-            console.log(`Music Glow: Avg Audio = ${average.toFixed(2)}, Blur = ${newBlur.toFixed(2)}px, AC State: ${audioContext.state}`);
+        if (frameCount % 200 === 0) { // Less frequent logging
+             // Optional: log average audio if needed for debugging bar heights
+            // let sum = 0; dataArray.forEach(val => sum += val); const avg = sum / dataArray.length;
+            // console.log(`Visualizer Loop: Avg Freq Data ~ ${avg.toFixed(2)}, AC State: ${audioContext.state}`);
         }
-        requestAnimationFrame(drawGlow);
     }
+
 
     // --- Background Music Playback Logic ---
     if (backgroundMusic) {
-        backgroundMusic.volume = 0.3; // Set desired music volume
+        backgroundMusic.volume = 0.3;
 
-        const startMusicAndGlow = () => {
-            // This function is called once music successfully starts
-            console.log('Music playback successful. Initializing reactive glow.');
-            initAudioReactiveGlow(); // Initialize Web Audio API and glow effect
+        const startMusicAndVisualizer = () => {
+            console.log('Music playback successful. Initializing audio visualizer.');
+            initAudioVisualizer();
         };
 
         const playPromise = backgroundMusic.play();
         if (playPromise !== undefined) {
-            playPromise.then(startMusicAndGlow) // If autoplay works, init glow
+            playPromise.then(startMusicAndVisualizer)
             .catch(error => {
                 console.warn('Music autoplay prevented:', error);
-                console.log('Setting up click listener to start music and glow.');
-                // Fallback: play music and init glow on the first user click
                 const playMusicOnClick = () => {
                     backgroundMusic.play()
-                        .then(startMusicAndGlow) // If click-triggered play works, init glow
+                        .then(startMusicAndVisualizer)
                         .catch(err => console.error('Error playing music after click:', err));
                 };
                 document.body.addEventListener('click', playMusicOnClick, { once: true });
+                console.log('Fallback: Click page to start music and visualizer.');
             });
         }
 
         backgroundMusic.onpause = () => {
-            console.log('Music paused. Stopping glow loop.');
-            window.isGlowLoopRunning = false;
+            console.log('Music paused. Stopping visualizer loop.');
+            window.isVisualizerLoopRunning = false;
         };
-        backgroundMusic.onplay = () => { // When music resumes (e.g. after pause, or if it starts delayed)
-            console.log('Music playing event.');
-            // Ensure glow restarts if context is ready and music is actually playing
+        backgroundMusic.onplay = () => {
+            console.log('Music playing event (visualizer).');
             if (audioContext && audioContext.state === 'running') {
-                if (!window.isGlowLoopRunning) {
-                    console.log('Music playing, AC running, restarting glow loop.');
-                    window.isGlowLoopRunning = true;
-                    drawGlow();
+                if (!window.isVisualizerLoopRunning) {
+                    console.log('Music playing, AC running, restarting visualizer loop.');
+                    window.isVisualizerLoopRunning = true;
+                    resizeCanvas(); // Ensure canvas is sized correctly
+                    drawVisualizer();
                 }
             } else if (audioContext && audioContext.state === 'suspended') {
-                // If context is suspended, try to resume it (e.g. if user re-enables tab)
                 audioContext.resume().then(() => {
-                    if (!window.isGlowLoopRunning) {
-                         window.isGlowLoopRunning = true;
-                         drawGlow();
+                    if (!window.isVisualizerLoopRunning) {
+                         window.isVisualizerLoopRunning = true;
+                         resizeCanvas();
+                         drawVisualizer();
                     }
                 });
             }
-            // If audioContext isn't even set up yet but music starts,
-            // the initial playPromise handler or click handler should have called initAudioReactiveGlow.
         };
-
-    } else { // No backgroundMusic element found
-        console.log('Background music element not found. No music or reactive glow will be initialized.');
+    } else {
+        console.log('Background music element not found. No music or visualizer will be initialized.');
     }
-
     console.log('Initial script setup complete.');
 });

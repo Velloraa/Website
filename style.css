@@ -1,8 +1,6 @@
 /* style.css */
 
-/* ------------------------------------------------ */
-/* 1. DEFINE YOUR CUSTOM FONT                       */
-/* ------------------------------------------------ */
+/* ... (Keep your existing @font-face, body, html, .video-background, #bgVideo styles) ... */
 @font-face {
     font-family: 'MingGothicCustom';
     src: url('Ming Gothic.ttf') format('truetype');
@@ -10,9 +8,6 @@
     font-style: normal;
 }
 
-/* ------------------------------------------------ */
-/* 2. GENERAL BODY AND HTML STYLES                  */
-/* ------------------------------------------------ */
 body, html {
     margin: 0;
     padding: 0;
@@ -20,9 +15,6 @@ body, html {
     overflow: hidden;
 }
 
-/* ------------------------------------------------ */
-/* 3. VIDEO BACKGROUND STYLES                       */
-/* ------------------------------------------------ */
 .video-background {
     position: fixed;
     top: 0;
@@ -39,9 +31,6 @@ body, html {
     object-fit: cover;
 }
 
-/* ------------------------------------------------ */
-/* 4. CONTENT STYLING (TEXT CONTAINER)              */
-/* ------------------------------------------------ */
 .content {
     display: flex;
     flex-direction: column;
@@ -49,33 +38,33 @@ body, html {
     align-items: center;
     height: 100vh;
     text-align: center;
-    position: relative;
-    z-index: 1;
+    position: relative; /* Important for positioning canvas */
+    z-index: 1; /* Ensure .content is above .video-background */
 }
 
-/* ------------------------------------------------ */
-/* 5. "Velloraa" TEXT STYLING - ULTRA SIMPLIFIED GLOW */
-/* ------------------------------------------------ */
+/* Canvas Styling */
+#audioVisualizerCanvas {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%); /* Center the canvas */
+    /* Set canvas dimensions in JavaScript for better control,
+       but you can provide fallback or max dimensions here */
+    /* width: 600px;  Example, will be set in JS */
+    /* height: 200px; Example, will be set in JS */
+    z-index: 1; /* Canvas itself */
+}
+
 .content h1 {
     font-size: 5rem;
     color: white;
     font-family: 'MingGothicCustom', sans-serif;
-    
-    --glow-color-1: #A020F0;
-    --glow-blur-reactive: 10px; /* Initial base blur, JS updates this */
-
-    /* --- ULTRA SIMPLIFIED TEXT SHADOW FOR TESTING --- */
     text-shadow:
-        /* The white core shadow is now also commented out: */
-        /* 0 0 7px #fff, */
-        
-        /* ABSOLUTELY ONLY THE REACTIVE GLOW LAYER IS ACTIVE: */
-        0 0 var(--glow-blur-reactive) var(--glow-color-1);
-        
-        /* --- Static layers remain commented out: --- */
-        /* 0 0 20px var(--glow-color-1), */
-        /* 0 0 30px var(--glow-color-2), */
-        /* 0 0 40px var(--glow-color-2); */
-
-    /* transition: text-shadow 0.1s ease-out; */ /* Keep this commented out for now */
+        0 0 7px #fff,
+        0 0 10px #A020F0,
+        0 0 20px #A020F0,
+        0 0 30px #BA55D3,
+        0 0 45px #BA55D3;
+    position: relative; /* Ensure h1 can have a z-index */
+    z-index: 2; /* Make sure h1 is above the canvas */
 }
