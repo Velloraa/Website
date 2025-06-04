@@ -3,21 +3,22 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded and parsed');
 
+    const entryOverlay = document.getElementById('entryOverlay');
+    const appContainer = document.getElementById('appContainer');
     const video = document.getElementById('bgVideo');
     const backgroundMusic = document.getElementById('backgroundMusic');
-    const velloraaText = document.querySelector('.content h1'); // We might not need this directly now
-
-    // --- Canvas and Audio Visualizer Setup ---
     const canvas = document.getElementById('audioVisualizerCanvas');
-    let canvasCtx; // Will be initialized later
+    let canvasCtx;
 
     // Web Audio API variables
     let audioContext;
     let analyser;
-    let sourceNode; // Will be created from the backgroundMusic element
-    let dataArray; // For frequency data
-    window.isVisualizerLoopRunning = false;
+    let sourceNode;
+    let dataArray;
+    window.isVisualizerLoopRunning = false; // Keep this global if other scripts might interact
 
+    if (!entryOverlay) console.error('Entry overlay #entryOverlay not found!');
+    if (!appContainer) console.error('App container #appContainer not found!');
     if (!video) console.error('Video element #bgVideo not found!');
     if (!backgroundMusic) console.error('Audio element #backgroundMusic not found!');
     if (!canvas) {
@@ -26,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
         canvasCtx = canvas.getContext('2d');
     }
 
-    // --- Function to initialize Web Audio API for Visualizer ---
     function initAudioVisualizer() {
         if (!backgroundMusic || !canvasCtx) {
             console.error("Cannot init visualizer: Music or Canvas context missing.");
@@ -43,17 +43,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('Visualizer AudioContext created. State:', audioContext.state);
 
                 analyser = audioContext.createAnalyser();
-                analyser.smoothingTimeConstant = 0.8; // Adjust for smoother transitions
+                analyser.smoothingTimeConstant = 0.8;
                 console.log('Visualizer AnalyserNode created.');
 
-                if (!sourceNode) {
+                if (!sourceNode) { // Ensure sourceNode is created only once
                     sourceNode = audioContext.createMediaElementSource(backgroundMusic);
                     console.log('MediaElementSourceNode for visualizer created from music element.');
+                    sourceNode.connect(analyser);
+                    analyser.connect(audioContext.destination); // Output audio to speakers
+                    console.log('Visualizer audio pipeline connected.');
                 }
 
-                sourceNode.connect(analyser);
-                analyser.connect(audioContext.destination); // Output audio to speakers
-                console.log('Visualizer audio pipeline connected.');
 
             } catch (e) {
                 console.error("Error during visualizer AudioContext setup:", e);
@@ -67,140 +67,158 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('Visualizer AudioContext resumed. State:', audioContext.state);
                 if (!window.isVisualizerLoopRunning && !backgroundMusic.paused) {
                     window.isVisualizerLoopRunning = true;
-                    resizeCanvas(); // Resize canvas before starting loop
+                    resizeCanvas();
                     drawVisualizer();
                 }
             }).catch(err => console.error("Error resuming visualizer AudioContext:", err));
         } else if (audioContext.state === 'running' && !window.isVisualizerLoopRunning && !backgroundMusic.paused) {
             console.log('Visualizer AC running, music playing, starting visualizer loop.');
             window.isVisualizerLoopRunning = true;
-            resizeCanvas(); // Resize canvas before starting loop
+            resizeCanvas();
             drawVisualizer();
         }
 
-        analyser.fftSize = 256; // Number of samples for FFT (power of 2, e.g., 256, 512, 1024)
-                               // Affects number of bars / data points
-        const bufferLength = analyser.frequencyBinCount; // Half of fftSize
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
         console.log('Visualizer Analyser FFT set. Buffer length:', bufferLength);
     }
 
     function resizeCanvas() {
-        if (!canvas) return;
-        // Example: Set canvas size. Adjust these values as needed.
-        // Make it somewhat responsive or sized relative to the text.
-        // For now, a fixed size.
-        const desiredWidth = Math.min(window.innerWidth * 0.7, 600); // Max 600px or 70% of window
-        const desiredHeight = 200;
+        if (!canvas || !canvasCtx) return;
+        const velloraaTextElement = document.querySelector('.content h1');
+        let referenceElement = velloraaTextElement;
+        if (!referenceElement || getComputedStyle(referenceElement).display === 'none') {
+            referenceElement = canvas.parentElement; // Fallback to parent if text hidden
+        }
+        
+        // Attempt to size canvas relative to the "Velloraa" text or its container
+        // This is a simplified approach; you might need more sophisticated logic
+        // if the text's size is dynamic or hard to predict before rendering.
+        const textRect = referenceElement.getBoundingClientRect();
+        
+        // Make canvas wide enough for text, with some padding, or a max width
+        const desiredWidth = Math.min(window.innerWidth * 0.7, Math.max(300, textRect.width + 40));
+        const desiredHeight = Math.max(100, textRect.height * 1.5); // Taller than text
 
         canvas.width = desiredWidth;
         canvas.height = desiredHeight;
-        console.log(`Canvas resized to: ${canvas.width}x${canvas.height}`);
+        console.log(`Canvas resized to: ${canvas.width}x${canvas.height} based on reference element`);
     }
-    // Call resizeCanvas initially and on window resize
+    
     // window.addEventListener('resize', resizeCanvas); // Optional: make it responsive
 
     let frameCount = 0;
-
-    // --- Function to draw the visualizer on the canvas ---
     function drawVisualizer() {
         if (!window.isVisualizerLoopRunning || !analyser || !dataArray || !canvasCtx ||
             !audioContext || audioContext.state !== 'running') {
             if (audioContext && audioContext.state !== 'running') {
-                window.isVisualizerLoopRunning = false;
+                window.isVisualizerLoopRunning = false; // Stop if AC is not running
             }
             return;
         }
-        requestAnimationFrame(drawVisualizer); // Loop the drawing
+        requestAnimationFrame(drawVisualizer);
 
-        analyser.getByteFrequencyData(dataArray); // Get frequency data into dataArray
+        analyser.getByteFrequencyData(dataArray);
+        canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
-        canvasCtx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
-
-        const numBars = dataArray.length * 0.8; // Use about 80% of the available frequency bins
-        const barSpacing = 2; // Spacing between bars
+        const numBars = dataArray.length * 0.8;
+        const barSpacing = 2;
         const totalSpacing = (numBars - 1) * barSpacing;
         const barWidth = (canvas.width - totalSpacing) / numBars;
-        
         let x = 0;
 
         for (let i = 0; i < numBars; i++) {
-            // Scale bar height: dataArray[i] is 0-255. Make it relative to canvas height.
-            // Add a sensitivity factor.
-            const barHeightScale = 0.5; // Adjust this to make bars taller/shorter
+            const barHeightScale = 0.5;
             const barHeight = (dataArray[i] / 255) * canvas.height * barHeightScale;
-
-            // Color: static purple, or make it dynamic
-            const r = 128 + (dataArray[i] / 2); // More purple/blue with intensity: 128-255
+            const r = 128 + (dataArray[i] / 2);
             const g = 0;
-            const b = 128 + dataArray[i];       // More magenta/purple with intensity: 128-255
+            const b = 128 + dataArray[i];
             canvasCtx.fillStyle = `rgb(${r},${g},${b})`;
-            // Or a fixed purple: canvasCtx.fillStyle = 'rgba(160, 32, 240, 0.8)'; // #A020F0 with opacity
-
-            // Draw bar (from bottom up)
             canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-
-            x += barWidth + barSpacing; // Move to next bar position
+            x += barWidth + barSpacing;
         }
-
-        frameCount++;
-        if (frameCount % 200 === 0) { // Less frequent logging
-             // Optional: log average audio if needed for debugging bar heights
-            // let sum = 0; dataArray.forEach(val => sum += val); const avg = sum / dataArray.length;
-            // console.log(`Visualizer Loop: Avg Freq Data ~ ${avg.toFixed(2)}, AC State: ${audioContext.state}`);
-        }
+        // frameCount++; // Not strictly needed unless debugging
     }
 
+    function startApp() {
+        console.log('Starting main application...');
+        if (appContainer) {
+            appContainer.style.display = 'block'; // Or 'flex' if its direct children need flex layout
+        }
+        
+        // Resize canvas now that it's visible
+        resizeCanvas(); 
 
-    // --- Background Music Playback Logic ---
-    if (backgroundMusic) {
-        backgroundMusic.volume = 0.3;
-
-        const startMusicAndVisualizer = () => {
-            console.log('Music playback successful. Initializing audio visualizer.');
-            initAudioVisualizer();
-        };
-
-        const playPromise = backgroundMusic.play();
-        if (playPromise !== undefined) {
-            playPromise.then(startMusicAndVisualizer)
-            .catch(error => {
-                console.warn('Music autoplay prevented:', error);
-                const playMusicOnClick = () => {
-                    backgroundMusic.play()
-                        .then(startMusicAndVisualizer)
-                        .catch(err => console.error('Error playing music after click:', err));
-                };
-                document.body.addEventListener('click', playMusicOnClick, { once: true });
-                console.log('Fallback: Click page to start music and visualizer.');
-            });
+        if (video) {
+            video.play().catch(error => console.error('Error playing video:', error));
         }
 
-        backgroundMusic.onpause = () => {
-            console.log('Music paused. Stopping visualizer loop.');
-            window.isVisualizerLoopRunning = false;
-        };
-        backgroundMusic.onplay = () => {
-            console.log('Music playing event (visualizer).');
-            if (audioContext && audioContext.state === 'running') {
-                if (!window.isVisualizerLoopRunning) {
-                    console.log('Music playing, AC running, restarting visualizer loop.');
-                    window.isVisualizerLoopRunning = true;
-                    resizeCanvas(); // Ensure canvas is sized correctly
-                    drawVisualizer();
-                }
-            } else if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume().then(() => {
-                    if (!window.isVisualizerLoopRunning) {
-                         window.isVisualizerLoopRunning = true;
-                         resizeCanvas();
-                         drawVisualizer();
-                    }
+        if (backgroundMusic) {
+            backgroundMusic.volume = 0.3;
+            backgroundMusic.loop = true; // Ensure loop is set
+
+            const startMusicAndVisualizer = () => {
+                console.log('Music playback successful. Initializing audio visualizer.');
+                initAudioVisualizer();
+            };
+
+            // User interaction (the click to enter) should allow audio to play.
+            const playPromise = backgroundMusic.play();
+            if (playPromise !== undefined) {
+                playPromise.then(startMusicAndVisualizer)
+                .catch(error => {
+                    console.warn('Music play prevented even after initial interaction:', error);
+                    // You might add a fallback UI element here to manually start music if this fails
+                    document.body.addEventListener('click', () => { // One more attempt on another click
+                         backgroundMusic.play().then(startMusicAndVisualizer).catch(e => console.error("Still can't play", e));
+                    }, { once: true });
                 });
             }
-        };
-    } else {
-        console.log('Background music element not found. No music or visualizer will be initialized.');
+
+            backgroundMusic.onpause = () => {
+                console.log('Music paused. Stopping visualizer loop.');
+                window.isVisualizerLoopRunning = false;
+            };
+            backgroundMusic.onplay = () => {
+                console.log('Music playing event (visualizer).');
+                 // Ensure AudioContext is running and visualizer starts
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        if (!window.isVisualizerLoopRunning) {
+                             console.log('AC resumed, restarting visualizer loop.');
+                             window.isVisualizerLoopRunning = true;
+                             resizeCanvas(); // Ensure canvas is sized
+                             drawVisualizer();
+                        }
+                    });
+                } else if (audioContext && audioContext.state === 'running') {
+                    if (!window.isVisualizerLoopRunning) {
+                        console.log('Music playing, AC running, restarting visualizer loop.');
+                        window.isVisualizerLoopRunning = true;
+                        resizeCanvas(); // Ensure canvas is sized
+                        drawVisualizer();
+                    }
+                } else if (!audioContext) { // If visualizer wasn't initialized yet
+                    console.log('Music playing, initializing visualizer for the first time.');
+                    initAudioVisualizer();
+                }
+            };
+        } else {
+            console.log('Background music element not found. No music or visualizer will be initialized.');
+        }
+        console.log('Main application setup complete.');
     }
-    console.log('Initial script setup complete.');
+
+    if (entryOverlay) {
+        entryOverlay.addEventListener('click', function() {
+            console.log('"Click 2 Enter" clicked.');
+            entryOverlay.style.display = 'none'; // Hide the overlay
+            startApp(); // Start the main application
+        }, { once: true }); // Ensure this listener runs only once
+    } else {
+        // Fallback if entryOverlay is not found (e.g., during development/testing)
+        console.warn('Entry overlay not found, starting app directly.');
+        startApp();
+    }
 });
