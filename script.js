@@ -106,8 +106,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // --- Adjust these for desired "brightness" (blur radius) effect ---
         const minBlur = 8;    // Minimum blur when quiet
-        const maxBlur = 100;   // Maximum blur when loud (making it appear "brighter"/larger)
-        const sensitivity = 10; // How much audio affects blur (higher = more sensitive)
+        const maxBlur = 1000;   // Maximum blur when loud (making it appear "brighter"/larger)
+        const sensitivity = 100; // How much audio affects blur (higher = more sensitive)
 
         let newBlur = minBlur + (average / 255) * (maxBlur - minBlur) * sensitivity;
         newBlur = Math.min(maxBlur, Math.max(minBlur, newBlur)); // Clamp value
