@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
         canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
         const numBars = dataArray.length * 0.8;
-        const barSpacing = 4;
+        const barSpacing = 2;
         const totalSpacing = (numBars - 1) * barSpacing;
         const barWidth = (canvas.width - totalSpacing) / numBars;
         let x = 0;
