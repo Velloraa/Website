@@ -1,55 +1,96 @@
 // script.js
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM fully loaded and parsed');
+
     const video = document.getElementById('bgVideo');
     const velloraaText = document.querySelector('.content h1');
     let audioContext;
     let analyser;
-    let source;
+    let sourceNode; // Renamed from 'source' to avoid confusion with <source> element
     let dataArray;
 
-    // Set initial video volume (as requested previously)
-    if (video) {
-        video.volume = 0.5;
+    window.isGlowLoopRunning = false; // Initialize the flag globally for clarity
+
+    if (!video) {
+        console.error('Video element #bgVideo not found!');
+        return;
+    }
+    if (!velloraaText) {
+        console.error('Text element .content h1 not found!');
+        return;
     }
 
-    function initAudioReactiveGlow() {
-        if (!audioContext) { // Initialize only once
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
+    // Set initial video volume
+    video.volume = 0.5;
+    console.log('Video volume set to 0.5');
 
+    function initAudioReactiveGlow() {
+        console.log('Attempting to initialize Audio Reactive Glow...');
+
+        if (!audioContext) {
             try {
-                if (!source) {
-                    source = audioContext.createMediaElementSource(video);
+                console.log('Creating new AudioContext...');
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('AudioContext created. State:', audioContext.state);
+
+                analyser = audioContext.createAnalyser();
+                console.log('AnalyserNode created.');
+
+                // Crucial: MediaElementSourceNode can only be created once per media element
+                if (!sourceNode) {
+                    sourceNode = audioContext.createMediaElementSource(video);
+                    console.log('MediaElementSourceNode created from video.');
                 }
-                source.connect(analyser);
-                analyser.connect(audioContext.destination);
+
+                sourceNode.connect(analyser);
+                console.log('SourceNode connected to Analyser.');
+                analyser.connect(audioContext.destination); // Connect analyser to output to hear sound
+                console.log('Analyser connected to audioContext.destination.');
+
             } catch (e) {
-                console.error("Error connecting media element source:", e);
-                return; 
+                console.error("Error during AudioContext or Node setup:", e);
+                return; // Stop if critical setup fails
             }
         }
 
+        // Attempt to resume context if it's suspended (common before user interaction)
         if (audioContext.state === 'suspended') {
-            audioContext.resume().catch(err => console.error("Error resuming AudioContext:", err));
+            console.log('AudioContext is suspended. Attempting to resume...');
+            audioContext.resume()
+                .then(() => {
+                    console.log('AudioContext resumed successfully. State:', audioContext.state);
+                    // Start the draw loop only after successful resume if it wasn't running
+                    if (!window.isGlowLoopRunning && !video.paused) {
+                        console.log('AudioContext resumed and video is playing, starting glow loop.');
+                        window.isGlowLoopRunning = true;
+                        drawGlow();
+                    }
+                })
+                .catch(err => console.error("Error resuming AudioContext:", err));
+        } else if (audioContext.state === 'running' && !window.isGlowLoopRunning && !video.paused) {
+             console.log('AudioContext is running and video is playing, ensuring glow loop starts.');
+             window.isGlowLoopRunning = true;
+             drawGlow();
         }
+
 
         analyser.fftSize = 256;
         const bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
-
-        // Start the drawing loop if it's not already started
-        // (or ensure it continues if it was paused)
-        // We call it once here, and it will loop itself with requestAnimationFrame
-        if (!window.isGlowLoopRunning) { // Use a global flag or similar check
-             window.isGlowLoopRunning = true;
-             drawGlow();
-        }
+        console.log('Analyser FFT size set, dataArray initialized. Buffer length:', bufferLength);
     }
 
+    let frameCount = 0; // For less frequent logging from drawGlow
+
     function drawGlow() {
-        if (!analyser || !window.isGlowLoopRunning) { // Check flag to stop loop if needed
-            window.isGlowLoopRunning = false; // Ensure flag is reset if loop stops
+        if (!window.isGlowLoopRunning) {
+            // console.log('Glow loop is not running, exiting drawGlow.');
+            return; // Stop the loop if the flag is false
+        }
+        if (!analyser || !dataArray) {
+            console.warn('Analyser or dataArray not ready in drawGlow. Retrying animation frame.');
+            requestAnimationFrame(drawGlow);
             return;
         }
 
@@ -59,58 +100,71 @@ document.addEventListener('DOMContentLoaded', function() {
         for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
         }
-        const average = sum / dataArray.length || 0; // Ensure average is not NaN
+        const average = sum / dataArray.length || 0;
 
-        // --- ADJUST THESE VALUES FOR SENSITIVITY ---
-        const minBlur = 5;    // Minimum blur radius
-        const maxBlur = 60;   // Maximum blur radius
-        const sensitivity = 10; // Increased sensitivity
+        const minBlur = 5;
+        const maxBlur = 60;
+        const sensitivity = 3.5;
 
         let newBlur = minBlur + (average / 255) * (maxBlur - minBlur) * sensitivity;
-        newBlur = Math.min(maxBlur, Math.max(minBlur, newBlur)); // Clamp the value
+        newBlur = Math.min(maxBlur, Math.max(minBlur, newBlur));
 
         if (velloraaText) {
             velloraaText.style.setProperty('--glow-blur-reactive', newBlur + 'px');
         }
 
-        requestAnimationFrame(drawGlow); // Loop the drawing function
+        // Log values periodically to avoid flooding the console
+        frameCount++;
+        if (frameCount % 100 === 0) { // Log every 100 frames (approx every 1.6 seconds)
+            console.log(`drawGlow Loop: Average Audio = ${average.toFixed(2)}, New Blur = ${newBlur.toFixed(2)}px, AC State: ${audioContext ? audioContext.state : 'N/A'}`);
+        }
+
+        requestAnimationFrame(drawGlow);
     }
-    window.isGlowLoopRunning = false; // Initialize the flag
 
+    // --- Event Listeners to Start/Resume Audio Processing ---
 
-    if (video && velloraaText) {
-        video.onplay = () => {
-            // console.log("Video is playing. Attempting to init audio glow.");
-            if (!audioContext || audioContext.state === 'suspended') {
-                initAudioReactiveGlow();
-            } else if (audioContext.state === 'running' && !window.isGlowLoopRunning) {
-                // If context is running but loop was stopped for some reason, restart it
-                window.isGlowLoopRunning = true;
-                drawGlow();
+    video.onplay = () => {
+        console.log('Video "play" event triggered.');
+        if (audioContext && audioContext.state === 'running') {
+            console.log('Video playing, AudioContext running, ensuring glow loop is active.');
+            if (!window.isGlowLoopRunning) {
+                 window.isGlowLoopRunning = true;
+                 drawGlow(); // Start drawing if it wasn't already
             }
-        };
-        
-        video.onpause = () => {
-            // console.log("Video paused. Stopping glow loop.");
-            // Optionally stop the glow loop when video is paused to save resources
-             window.isGlowLoopRunning = false;
-        };
+        } else {
+            // If context not running or not initialized, initAudioReactiveGlow will handle it
+            initAudioReactiveGlow();
+        }
+    };
 
-        // Attempt to initialize and resume AudioContext on user interaction
-        document.body.addEventListener('click', () => {
-            if (!audioContext || audioContext.state === 'suspended') {
-                // console.log("Body clicked. Attempting to init audio glow if needed.");
-                initAudioReactiveGlow();
-            } else if (audioContext.state === 'running' && !window.isGlowLoopRunning && !video.paused) {
-                // If context is running, video is playing, but loop stopped, restart.
-                window.isGlowLoopRunning = true;
-                drawGlow();
-            }
-        }, { once: false }); // Changed once to false to allow re-init if context gets messed up
-                            // Though ideally, it sets up once and just resumes.
-                            // For robustness on user clicking again if something went wrong.
+    video.onpause = () => {
+        console.log('Video "pause" event triggered. Stopping glow loop.');
+        window.isGlowLoopRunning = false;
+        // Optionally, you could also suspend the audioContext here if desired to save resources,
+        // but it will require resume on play again:
+        // if (audioContext && audioContext.state === 'running') {
+        //     audioContext.suspend().then(() => console.log('AudioContext suspended on video pause.'));
+        // }
+    };
 
-    } else {
-        console.error("Video element or text element not found.");
-    }
+    // General click listener on the body to try and resume/initialize AudioContext
+    // This is a fallback and primary mechanism for browsers requiring explicit user gesture.
+    document.body.addEventListener('click', function handleUserInteraction() {
+        console.log('Body click detected. Attempting to initialize/resume AudioContext.');
+        if (!audioContext || audioContext.state !== 'running') {
+            initAudioReactiveGlow();
+        } else if (!window.isGlowLoopRunning && !video.paused) {
+            // If AC is running but loop isn't and video is playing
+            console.log('Body click: AC running, video playing, loop not running. Starting loop.');
+            window.isGlowLoopRunning = true;
+            drawGlow();
+        }
+        // Remove this listener after the first successful interaction if you only need it once
+        // For robustness, keeping it might allow user to "re-initiate" if something unexpected happened.
+        // Or use { once: true } if confident one click is enough:
+        // document.body.removeEventListener('click', handleUserInteraction);
+    }/*, { once: true } */); // Consider using { once: true } if one click should be enough
+
+    console.log('Event listeners set up.');
 });
