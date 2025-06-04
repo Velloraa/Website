@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // --- ADJUST THESE VALUES FOR SENSITIVITY ---
         const minBlur = 5;    // Minimum blur radius
         const maxBlur = 60;   // Maximum blur radius
-        const sensitivity = 3.5; // Increased sensitivity
+        const sensitivity = 10; // Increased sensitivity
 
         let newBlur = minBlur + (average / 255) * (maxBlur - minBlur) * sensitivity;
         newBlur = Math.min(maxBlur, Math.max(minBlur, newBlur)); // Clamp the value
