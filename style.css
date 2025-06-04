@@ -4,8 +4,8 @@
 /* 1. DEFINE YOUR CUSTOM FONT                       */
 /* ------------------------------------------------ */
 @font-face {
-    font-family: 'MingGothicCustom'; /* Name you'll use to apply the font */
-    src: url('Ming Gothic.ttf') format('truetype'); /* Points to your font file */
+    font-family: 'MingGothicCustom';
+    src: url('Ming Gothic.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
 }
@@ -17,7 +17,7 @@ body, html {
     margin: 0;
     padding: 0;
     height: 100%;
-    overflow: hidden; /* Prevents scrollbars if video is slightly larger */
+    overflow: hidden;
 }
 
 /* ------------------------------------------------ */
@@ -29,14 +29,14 @@ body, html {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: -1; /* Puts the video behind other content */
-    background-color: #333; /* Fallback if video/poster fails */
+    z-index: -1;
+    background-color: #333; /* Fallback */
 }
 
 #bgVideo {
     width: 100%;
     height: 100%;
-    object-fit: cover; /* Ensures the video covers the screen without distortion */
+    object-fit: cover;
 }
 
 /* ------------------------------------------------ */
@@ -54,31 +54,28 @@ body, html {
 }
 
 /* ------------------------------------------------ */
-/* 5. "Velloraa" TEXT STYLING WITH REACTIVE PURPLE GLOW */
+/* 5. "Velloraa" TEXT STYLING - ULTRA SIMPLIFIED GLOW */
 /* ------------------------------------------------ */
 .content h1 {
-    font-size: 5rem; /* Adjust size as needed */
-    color: white;    /* Base text color */
-    font-family: 'MingGothicCustom', sans-serif; /* Your custom font with a fallback */
+    font-size: 5rem;
+    color: white;
+    font-family: 'MingGothicCustom', sans-serif;
     
-    /* CSS variables define the glow */
-    --glow-color-1: #A020F0;    /* Main purple for reactive glow */
-    --glow-blur-reactive: 10px; /* Initial/base blur, JS will update this */
-    /* --glow-color-2: #BA55D3; */ /* Not used in this simplified version */
+    --glow-color-1: #A020F0;
+    --glow-blur-reactive: 10px; /* Initial base blur, JS updates this */
 
-    /* --- SIMPLIFIED TEXT SHADOW FOR TESTING --- */
+    /* --- ULTRA SIMPLIFIED TEXT SHADOW FOR TESTING --- */
     text-shadow:
-        /* You can keep or comment out this white core for further testing: */
-        0 0 7px #fff,
+        /* The white core shadow is now also commented out: */
+        /* 0 0 7px #fff, */
         
-        /* ONLY THE REACTIVE GLOW LAYER IS ACTIVE: */
+        /* ABSOLUTELY ONLY THE REACTIVE GLOW LAYER IS ACTIVE: */
         0 0 var(--glow-blur-reactive) var(--glow-color-1);
         
-        /* --- These static layers are now commented out: --- */
+        /* --- Static layers remain commented out: --- */
         /* 0 0 20px var(--glow-color-1), */
         /* 0 0 30px var(--glow-color-2), */
         /* 0 0 40px var(--glow-color-2); */
 
-    /* Optional: keep the transition, or comment it out if you want to see raw changes */
-    transition: text-shadow 0.1s ease-out;
+    /* transition: text-shadow 0.1s ease-out; */ /* Keep this commented out for now */
 }
