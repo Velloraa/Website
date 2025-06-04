@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const textRect = referenceElement.getBoundingClientRect();
         
-        const desiredWidth = Math.min(window.innerWidth * 0.7, Math.max(300, textRect.width + 40));
+        const desiredWidth = Math.min(window.innerWidth * 0.7, Math.max(400, textRect.width + 40));
         const desiredHeight = Math.max(100, textRect.height * 1.5); 
 
         canvas.width = desiredWidth;
