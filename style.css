@@ -45,7 +45,7 @@ body, html {
 /* Canvas Styling */
 #audioVisualizerCanvas {
     position: absolute;
-    left: 50%;
+    left: 40%;
     top: 50%;
     transform: translate(-50%, -50%); /* Center the canvas */
     /* Set canvas dimensions in JavaScript for better control,
