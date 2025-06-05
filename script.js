@@ -84,8 +84,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function resizeCanvas() {
         if (!canvas || !canvasCtx) return;
-        const velloraaTextElement = document.querySelector('.content h1');
-        let referenceElement = velloraaTextElement;
+        const cayseyTextElement = document.querySelector('.content h1');
+        let referenceElement = cayseyTextElement;
         if (!referenceElement || getComputedStyle(referenceElement).display === 'none') {
             referenceElement = canvas.parentElement; 
         }
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.warn('Music play prevented even after initial interaction:', error);
                     // Fallback attempt
                     document.body.addEventListener('click', () => { 
-                         backgroundMusic.play().then(startMusicAndVisualizer).catch(e => console.error("Still can't play music after second attempt", e));
+                        backgroundMusic.play().then(startMusicAndVisualizer).catch(e => console.error("Still can't play music after second attempt", e));
                     }, { once: true });
                 });
             }
@@ -204,13 +204,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (audioContext && audioContext.state === 'suspended') {
                     audioContext.resume().then(() => {
                         if (!window.isVisualizerLoopRunning) {
-                             console.log('AC resumed, restarting visualizer loop.');
-                             window.isVisualizerLoopRunning = true;
-                             resizeCanvas();
-                             drawVisualizer();
+                            console.log('AC resumed, restarting visualizer loop.');
+                            window.isVisualizerLoopRunning = true;
+                            resizeCanvas();
+                            drawVisualizer();
                         }
                     });
-                } else if (audioContext && audioContext.state === 'running') {
+                } else if (audioContext && audio_context.state === 'running') {
                     if (!window.isVisualizerLoopRunning) {
                         console.log('Music playing, AC running, restarting visualizer loop.');
                         window.isVisualizerLoopRunning = true;
