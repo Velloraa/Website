@@ -1,5 +1,3 @@
-// script.js
-
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded and parsed');
 
@@ -84,8 +82,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function resizeCanvas() {
         if (!canvas || !canvasCtx) return;
-        const cayseyTextElement = document.querySelector('.content h1');
-        let referenceElement = cayseyTextElement;
+        const nyxussTextElement = document.querySelector('.content h1');
+        let referenceElement = nyxussTextElement;
         if (!referenceElement || getComputedStyle(referenceElement).display === 'none') {
             referenceElement = canvas.parentElement; 
         }
