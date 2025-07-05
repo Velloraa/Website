@@ -82,8 +82,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function resizeCanvas() {
         if (!canvas || !canvasCtx) return;
-        const nyxussTextElement = document.querySelector('.content h1');
-        let referenceElement = nyxussTextElement;
+        const cayseyTextElement = document.querySelector('.content h1');
+        let referenceElement = cayseyTextElement;
         if (!referenceElement || getComputedStyle(referenceElement).display === 'none') {
             referenceElement = canvas.parentElement; 
         }
